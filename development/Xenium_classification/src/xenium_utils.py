@@ -20,6 +20,7 @@ from xarray import DataArray
 from spatialdata_io._constants._constants import VisiumKeys
 from spatialdata_io._docs import inject_docs
 from spatialdata_io.readers._utils._utils import _read_counts
+from spatialdata.models._utils import DEFAULT_COORDINATE_SYSTEM
 
 # from https://github.com/scverse/spatialdata-io/blob/main/src/spatialdata_io/readers/visium.py#L141
 def load_registered_image(tif_path):
@@ -128,10 +129,20 @@ def sdata_load_img_mask(sdata, affineT=None,
     # If using bbox, transform shapes then translate back to origin
     t_shapes = Sequence([get_transformation(sdata.shapes[shape_key]),
                          get_transformation(sdata.images[img_key]).inverse()])
+                         
+    # set_transformation(sdata.shapes[shape_key], t_shapes)
+    # spatialdata 0.1.2 version
+    #shapes = transform(sdata.shapes[shape_key], to_coordinate_system=DEFAULT_COORDINATE_SYSTEM)
+    # spatialdata 0.0.9 version
     shapes = transform(sdata.shapes[shape_key], t_shapes)
     # Affine transform
     if affineT:
+        # spatialdata 0.1.2 version
+        #set_transformation(shapes, affineT)
+        #shapes = transform(shapes, to_coordinate_system=DEFAULT_COORDINATE_SYSTEM)
+        # spatialdata 0.0.9 version
         shapes = transform(shapes, affineT)
+    # spatialdata 0.0.9 version
     shapes.index = shapes.index.astype(int)
     # NOTE: Bounding box query resets (removes) categories for the adata table
     # so, can use the original labels instead
@@ -142,19 +153,24 @@ def sdata_load_img_mask(sdata, affineT=None,
     shapes_df = shapes.merge(labels, how = 'inner', right_index = True, left_index = True)
     shapes_df['label'] = shapes_df[label_key].cat.codes
     # Following lbl dicts are unused for now
-    int2lbl = dict(enumerate(shapes_df[label_key].cat.categories))
-    lbl2int = dict(zip(int2lbl.values(), int2lbl.keys()))
+    # int2lbl = dict(enumerate(shapes_df[label_key].cat.categories))
+    # lbl2int = dict(zip(int2lbl.values(), int2lbl.keys()))
     shapes_df_dict = {k: v for k, v in shapes_df.groupby(label_key)}                     
     img = sdata.images[img_key]
     if isinstance(img, msi.multiscale_spatial_image.MultiscaleSpatialImage):
         # Note that this clears any transformation attribute
         img = Image2DModel.parse(img["scale0"].ds.to_array().squeeze(axis=0))
-    img = img.values # NOTE: this errors on int16 dtypes
-    masks = [mask_for_polygons(v['geometry'].tolist(),
-                               img.shape[-2:],
-                               vals=(v.index.to_numpy() + 1).tolist()) # Add 1 here in case val is 0 (background)
-             # https://stackoverflow.com/questions/60484383/typeerror-scalar-value-for-argument-color-is-not-numeric-when-using-opencv
-            for k, v in shapes_df_dict.items()]
+    img = img.values # NOTE: this errors on int16 dtypes    
+    masks = [
+        mask_for_polygons(
+            v['geometry'].tolist(),
+            img.shape[-2:],
+            # Add 1 here in case val is 0 (background)
+            vals=(v.index.to_numpy() + 1).tolist()
+        )
+        # https://stackoverflow.com/questions/60484383/typeerror-scalar-value-for-argument-color-is-not-numeric-when-using-opencv
+        for k, v in shapes_df_dict.items()
+    ]
     if expand_px:
         masks = [expand_labels(mask, distance=expand_px) for mask in masks]
     # Ideally expand_labels should be run on the merged mask, but the loop

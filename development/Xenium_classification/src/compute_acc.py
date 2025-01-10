@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+# coding: utf-8
+
 import argparse
 import cProfile as profile
 import glob

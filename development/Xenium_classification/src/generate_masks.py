@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+# coding: utf-8
+
 import spatialdata_io
 import squidpy as sq
 import spatialdata as sd
@@ -43,11 +46,10 @@ def main(args):
     out_dir = args.out_dir
     img_dir = f"{out_dir}/images"
     mask_dir = f"{out_dir}/masks"
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-        os.makedirs(img_dir)
-        os.makedirs(mask_dir)
-    warnings.warn("Created output directories")
+    for dir in [out_dir, img_dir, mask_dir]:
+        if not os.path.exists(dir):
+            warnings.warn(f'Creating output directory {dir}')
+            os.makedirs(dir)
 
     # Load data
     warnings.warn("Loading data...")
@@ -75,8 +77,8 @@ def main(args):
         sdata.table.obs['celltype_major'] = sdata.table.obs['celltype_major'].astype('category')
         assert len(sdata.table.obs['celltype_major'].cat.categories) == args.num_categories
         # Drop NA values
-            # FIXME: See comments in load_annotations
-            # We should not have any NA values
+        # FIXME: See comments in load_annotations
+        # We should not have any NA values
         # sdata.table.obs = sdata.table.obs.dropna()
         # sdata.table.write(f"{out_dir}/adata_filtered.h5ad")
         print(sdata.table.obs['celltype_major'].head(15))

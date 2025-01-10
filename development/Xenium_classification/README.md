@@ -10,7 +10,19 @@ The following data are required for each training sample (sequenced whole slide 
 Additionally, a single-cell reference atlas is needed to generate the cell type labels.
 
 ### 0. Installation
+
+Modules to load:
+```commandline
+$ module load gcc/12 # Otherwise ICU with fail with OSError: /lib64/libstdc++.so.6: version `GLIBCXX_3.4.30' not found
+```
+
 The `environment.yml` contains the required dependencies for the conda environment.
+
+Example:
+```commandline
+$ conda env create --prefix /scratch/project_mnt/andrew/conda/hovernet --file /scratch/project_mnt/andrew/STimage/development/Xenium_classification/environment.yml
+$ conda activate hovernet 
+```
 
 Computing performance metrics relies on some code from https://github.com/meszlili96/PanNukeChallenge. This repository should be cloned into the same folder as this source.
 
@@ -22,20 +34,37 @@ These labels are then processed and stored into an anndata object for the Xenium
 
 ```
 python load_annotations.py --xenium XENIUM_DIR --annotated ANNOTATED_PATH --out-dir OUT_DIR
-
 ```
 
 Alternatively, the labels can be provided in the form of a geopandas dataframe. See `generate_masks.py` for details.
 
 
-### 2. Register H&E image
-The H&E image must be registered to the Xenium DAPI data, which can be done with SIFT or similar methods. An affine transformation matrix should be saved as a csv file, with the standard 2x3 format. Example:
+### 2. Register H&E image and Alignment
+
+The full-color H&E image must be registered to the Xenium DAPI data to ensure proper alignment between the morphological information and the spatial gene expression data.
+
+Two ways to perform the registration:
+* Using Xenium Explorer:
+  - You can use Xenium Explorer to produce a transformation matrix and keypoints:
+https://www.10xgenomics.com/support/software/xenium-explorer/latest/tutorials/xe-image-alignment
+* Using the register.py script:
+  - Provide a greyscale DAPI TIFF image.
+  - Using OpenCV it generates the keypoints and transformation matrix.
+  
+An affine transformation matrix should be saved as a csv file, with the standard 2x3 format. Example:
 
 ```
 -0.002511365031637, -0.776020225795623, 27762.2568957
 0.775820476630406, -0.00237876719423, -1158.81828889
 ```
 
+Registration and alignment requires the transformation matrix. To align the RGB H&E image:
+```
+python ./src/alignment.py --out-dir OUT_DIR --tif-path RGB_MORPHOLOGY_OME_FILE --transform TRANSFORM_PATH
+```
+Here, `RGB_MORPHOLOGY_OME_FILE` is the path to the RGB H&E image file in OME-TIFF format and `TRANSFORM_PATH` is the CSV file containing the transformation matrix.
+
+Note: Make sure you have the necessary dependencies installed, such as OpenCV and any other required libraries, before running the scripts.
 
 ### 3. Generate training data
 The following command generates the training data (cell masks and H&E tiles) given the Xenium data and H&E image. 
